@@ -40,11 +40,5 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  if (user && path === "/kirjaudu") {
-    const url = request.nextUrl.clone();
-    url.pathname = "/pelit";
-    return NextResponse.redirect(url);
-  }
-
   return response;
 }

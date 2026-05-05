@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -24,6 +24,13 @@ export default function LoginForm() {
   const [otp, setOtp] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Jos käyttäjällä on jo validi sessio, ohjaa pois kirjautumissivulta
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) router.replace("/pelit");
+    });
+  }, []);
 
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault();
