@@ -32,8 +32,8 @@ export default function LoginForm() {
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
-        // Tärkeää: salli uusien käyttäjien rekisteröityminen tällä flowllä.
         shouldCreateUser: true,
+        emailRedirectTo: `${window.location.origin}/auth/callback`,
       },
     });
     setLoading(false);
