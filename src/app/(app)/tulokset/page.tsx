@@ -8,6 +8,7 @@ import {
 } from "@/lib/sports";
 import SportFilter from "@/components/SportFilter";
 import ResultForm from "./ResultForm";
+import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -82,6 +83,7 @@ export default async function TuloksetPage({
 
   return (
     <div className="flex flex-col gap-4">
+      <RealtimeRefresh />
       <h1 className="text-2xl font-bold">Tulokset</h1>
 
       {/* Yhteenveto */}
@@ -102,7 +104,12 @@ export default async function TuloksetPage({
           const r = g.results?.[0] ?? null;
           const iAmChallenger = g.challenger_id === user.id;
           const isCompleted = g.status === "completed";
-          const expanded = focusId === g.id || (!isCompleted && !r);
+          const myConfirmed = iAmChallenger
+            ? r?.confirmed_by_challenger
+            : r?.confirmed_by_opponent;
+          const pendingMyConfirm = !!(r && !myConfirmed && !isCompleted);
+          const expanded =
+            focusId === g.id || (!isCompleted && !r) || pendingMyConfirm;
 
           return (
             <article

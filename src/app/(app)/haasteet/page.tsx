@@ -8,6 +8,7 @@ import {
 } from "@/lib/sports";
 import RespondButtons from "./RespondButtons";
 import SportFilter from "@/components/SportFilter";
+import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,7 @@ export default async function HaasteetPage({
 
   return (
     <div className="flex flex-col gap-4">
+      <RealtimeRefresh />
       <h1 className="text-2xl font-bold">Haasteet</h1>
       <SportFilter />
 
