@@ -8,7 +8,9 @@
 -- Profiili sidotaan suoraan auth.users -taulun id:hen.
 create table if not exists public.users (
   id uuid primary key references auth.users(id) on delete cascade,
-  nickname text not null unique,
+  nickname text not null unique
+    check (nickname = btrim(nickname))
+    check (char_length(nickname) between 2 and 20),
   phone text,
   email text,
   created_at timestamptz not null default now()
@@ -87,37 +89,86 @@ alter table public.users   enable row level security;
 alter table public.games   enable row level security;
 alter table public.results enable row level security;
 
--- USERS: jokainen voi lukea, vain omistaja muokkaa / luo.
-create policy users_select on public.users for select using (true);
+-- USERS: id+nickname kaikille kirjautuneille, email/phone vain itselle (me-view).
+revoke select on public.users from anon, authenticated;
+grant  select (id, nickname, created_at) on public.users to authenticated;
 create policy users_insert_self on public.users for insert with check (auth.uid() = id);
 create policy users_update_self on public.users for update using (auth.uid() = id);
 
+-- Self-only view: omat yhteystiedot.
+create or replace view public.me
+with (security_invoker = true) as
+  select id, nickname, phone, email, created_at
+  from public.users
+  where id = auth.uid();
+grant select on public.me to authenticated;
+
 -- GAMES: kaikki luettavissa, luonti vain omalla nimellä.
+-- Vastauksen voi tehdä vain vastustaja, ja vain pending -> accepted/declined.
+-- Siirto completed-tilaan tapahtuu tuloksen vahvistuksen triggeristä.
 create policy games_select on public.games for select using (true);
 create policy games_insert on public.games for insert
   with check (challenger_id = auth.uid());
-create policy games_update on public.games for update using (
-  challenger_id = auth.uid() or opponent_id = auth.uid()
-);
+create policy games_update_respond on public.games for update
+  using (opponent_id = auth.uid() and status = 'pending')
+  with check (
+    opponent_id = auth.uid()
+    and status in ('accepted', 'declined')
+  );
 
--- RESULTS: kaikki luettavissa, insert/update vain pelin osapuolet.
+-- RESULTS: kaikki luettavissa, insert vain hyväksytyn pelin osapuolet.
+-- Update sallittu vain niin kauan kun molemmat eivät ole vielä vahvistaneet.
 create policy results_select on public.results for select using (true);
 create policy results_insert on public.results for insert
+  with check (
+    recorded_by = auth.uid()
+    and exists(
+      select 1 from public.games g
+      where g.id = game_id
+        and g.status = 'accepted'
+        and (g.challenger_id = auth.uid() or g.opponent_id = auth.uid())
+    )
+  );
+create policy results_update on public.results for update
+  using (
+    not (confirmed_by_challenger and confirmed_by_opponent)
+    and exists(
+      select 1 from public.games g
+      where g.id = game_id
+        and g.status = 'accepted'
+        and (g.challenger_id = auth.uid() or g.opponent_id = auth.uid())
+    )
+  )
   with check (
     exists(
       select 1 from public.games g
       where g.id = game_id
         and (g.challenger_id = auth.uid() or g.opponent_id = auth.uid())
     )
-    and recorded_by = auth.uid()
   );
-create policy results_update on public.results for update using (
-  exists(
-    select 1 from public.games g
-    where g.id = game_id
-      and (g.challenger_id = auth.uid() or g.opponent_id = auth.uid())
-  )
-);
 
--- Anna kirjautuneen lukea leaderboard-näkymä.
-grant select on public.leaderboard to anon, authenticated;
+-- Trigger: kun molemmat ovat vahvistaneet, peli completed-tilaan.
+create or replace function public.complete_game_when_confirmed()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.confirmed_by_challenger and new.confirmed_by_opponent then
+    update public.games
+       set status = 'completed'
+     where id = new.game_id
+       and status <> 'completed';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists results_complete_game on public.results;
+create trigger results_complete_game
+  after insert or update on public.results
+  for each row execute function public.complete_game_when_confirmed();
+
+-- Anna kirjautuneen lukea leaderboard-näkymä (ei anonille).
+grant select on public.leaderboard to authenticated;

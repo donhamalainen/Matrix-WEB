@@ -15,13 +15,14 @@ export default async function AppLayout({
 }) {
   const { profile } = await getProfile();
 
-  if (!profile) {
+  const nickname = profile?.nickname?.trim();
+  if (!nickname || nickname.length < 2) {
     redirect("/auth/nimimerkki");
   }
 
   return (
     <div className="flex flex-col flex-1 min-h-screen">
-      <TopBar nickname={profile.nickname} />
+      <TopBar nickname={nickname} />
       <main className="flex-1 w-full max-w-md mx-auto px-4 py-4 pb-24">
         {children}
       </main>

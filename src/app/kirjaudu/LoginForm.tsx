@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -14,10 +14,14 @@ import { createClient } from "@/lib/supabase/client";
  *  - Email Templates → "Magic Link" -mallin sisällössä on {{ .Token }}
  *    (lähettää 6-numeroisen koodin pelkän linkin sijaan)
  *  - Lokaalisti: koodit näkyvät Mailpitissa (http://127.0.0.1:54324)
+ *
+ * Huom: kirjautuneen käyttäjän redirect tehdään server-puolella
+ * /kirjaudu/page.tsx:ssä, joten tässä ei enää ole client-effektiä.
  */
 export default function LoginForm() {
   const router = useRouter();
-  const supabase = createClient();
+  // Yksi instanssi koko komponentin elämäksi.
+  const [supabase] = useState(() => createClient());
 
   const [step, setStep] = useState<"email" | "otp">("email");
   const [email, setEmail] = useState("");
@@ -25,22 +29,21 @@ export default function LoginForm() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Jos käyttäjällä on jo validi sessio, ohjaa pois kirjautumissivulta
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user) router.replace("/pelit");
-    });
-  }, []);
-
   async function sendOtp(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
     setLoading(true);
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (!siteUrl) {
+      setLoading(false);
+      setError("Sivuston URL puuttuu (NEXT_PUBLIC_SITE_URL).");
+      return;
+    }
     const { error } = await supabase.auth.signInWithOtp({
       email: email.trim(),
       options: {
         shouldCreateUser: true,
-        emailRedirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback`,
+        emailRedirectTo: `${siteUrl}/auth/callback`,
       },
     });
     setLoading(false);
@@ -65,7 +68,9 @@ export default function LoginForm() {
       setError(error.message);
       return;
     }
-    router.replace("/auth/nimimerkki");
+    // Ohjataan juureen — kirjaudu/page.tsx tekee oikean valinnan profiilin
+    // mukaan (joko /pelit tai /auth/nimimerkki).
+    router.replace("/");
     router.refresh();
   }
 

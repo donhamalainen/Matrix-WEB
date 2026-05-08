@@ -75,22 +75,22 @@ pm2 save
 | `_dmarc.boggo.fi`             | TXT       | `v=DMARC1; p=none`             |
 | `default._domainkey.boggo.fi` | TXT       | _(DKIM-avain)_                 |
 
-### SMTP (suunnitteilla)
+### SMTP
 
-Postfix + OpenDKIM Raspberry Pi:llä OTP-viestien lähettämiseen. Vaatii porttiohjauksen reitittimessä: `TCP 25 → 192.168.76.115:25`.
+Postfix + OpenDKIM Raspberry Pi:llä OTP-viestien lähettämiseen. Vaatii porttiohjauksen reitittimessä: `TCP 25/587 → 192.168.76.115`. Tarkemmat ohjeet: [deploy/POSTFIX.md](deploy/POSTFIX.md).
 
 ## Sovelluksen rakenne
 
 ```
 src/
 ├── app/
-│   ├── kirjaudu/                # Email OTP -kirjautuminen
+│   ├── kirjaudu/                # Email OTP -kirjautuminen (server-side session check)
 │   ├── auth/
-│   │   ├── callback/route.ts    # PKCE code exchange (magic link)
-│   │   └── nimimerkki/          # Nimimerkin asetus ensimmäisellä kerralla
+│   │   ├── callback/route.ts    # PKCE + token_hash, validoitu next-redirect
+│   │   └── nimimerkki/          # Nimimerkin asetus (server action createProfile)
 │   ├── (app)/                   # Suojattu app shell (yläpalkki + alanavi)
 │   │   ├── pelit/               # Pelit, haasteen lähetys
-│   │   ├── haasteet/            # Saapuneet, hyväksy/hylkää
+│   │   ├── haasteet/            # Saapuneet, hyväksy/hylkää (vain vastustaja)
 │   │   ├── tulokset/            # Tuloksen kirjaus + historia
 │   │   └── ranking/             # Leaderboard + lajisuodatin
 │   ├── layout.tsx
@@ -103,15 +103,16 @@ src/
 │   │   ├── client.ts            # Browser-client
 │   │   ├── server.ts            # Server Component -client (cookies)
 │   │   └── proxy.ts             # Middleware: sessio + reittisuojaus
-│   ├── auth.ts                  # requireUser / getProfile
+│   ├── auth.ts                  # requireUser / getProfile (lukee me-viewä)
 │   └── sports.ts                # Lajien metadata + värikoodit
 ├── proxy.ts                     # Middleware entry point
 supabase/
 ├── config.toml                  # Lokaalin Supabasen asetukset
-├── migrations/                  # SQL-migraatiot
+├── migrations/                  # SQL-migraatiot (ml. security_hardening)
 └── schema.sql                   # Tietokantaskeema
 deploy/
 ├── setup.sh                     # Nginx + SSL asennus
+├── POSTFIX.md                   # Postfix SMTP -dokumentaatio
 └── nginx/matrix.boggo.fi        # Nginx-konfiguraatio
 ```
 
@@ -137,19 +138,44 @@ Voitto = **3p** · Tasapeli = **1p** · Tappio = **0p**
 
 Ottelu lasketaan rankingiin vasta kun **molemmat osapuolet** ovat vahvistaneet saman lopputuloksen.
 
-## Tietoturva (RLS)
+## Tietoturva
 
-- Haasteita voi luoda vain oman nimissä; vain haasteen osapuolet voivat kirjata tuloksia.
-- Leaderboard-näkymä on luettavissa kaikille.
-- Auth callback käyttää PKCE-flowta (ei tokeneita URL:ssä).
+Row Level Security on päällä kaikissa tauluissa. Tarkemmat politiikat: [supabase/schema.sql](supabase/schema.sql).
+
+### Käyttäjät (`public.users`)
+
+- `select` rajattu sarakkeisiin `id, nickname, created_at` — vain kirjautuneille.
+- Email ja phone luetaan vain `public.me`-viewistä, joka palauttaa pelkästään omat tiedot (`auth.uid() = id`).
+- Profiilin luonti tehdään server actionissa [createProfile](src/app/auth/nimimerkki/actions.ts), joka lukee `phone`/`email` `auth.users`:sta — client ei voi spoofata niitä.
+- DB-rajoite: nimimerkki 2–20 merkkiä, ei whitespacea reunoissa.
+
+### Pelit (`public.games`)
+
+- `insert` vain omalla `challenger_id`:llä.
+- `update` vain vastustajalta, ja vain siirto `pending → accepted/declined`.
+- Siirto `completed`-tilaan tehdään triggerillä `complete_game_when_confirmed` — ei suoraan API:n kautta.
+
+### Tulokset (`public.results`)
+
+- `insert` vain hyväksytylle pelille (`status = 'accepted'`) ja `recorded_by = auth.uid()`.
+- `update` lukittu kun molemmat ovat vahvistaneet — vahvistettu tulos on immuuttinen.
+- Pelin `completed`-tila päivittyy automaattisesti triggeristä.
+
+### Auth-flow
+
+- Email OTP (6-numeroinen koodi) ja magic link (PKCE).
+- Kirjautuneen käyttäjän redirect tehdään server-puolella ([kirjaudu/page.tsx](src/app/kirjaudu/page.tsx)) — ei välkkyvää client-redirectiä.
+- `/auth/callback` validoi `next`-parametrin: vain saman originin `/`-alkuiset polut sallittu (estetään open-redirect `//evil.com`).
+- `signOut` tekee `revalidatePath("/", "layout")` ennen redirectäystä.
 
 ## Tehty / vielä tekemättä
 
-- ✅ Kirjautuminen (Email OTP + magic link) + nimimerkki
-- ✅ Haasteen lähetys, hyväksyntä, hylkäys
-- ✅ Tuloksen kirjaus + molempien vahvistus
+- ✅ Kirjautuminen (Email OTP + magic link) + nimimerkki (server action)
+- ✅ Haasteen lähetys, hyväksyntä (vain vastustaja), hylkäys
+- ✅ Tuloksen kirjaus + molempien vahvistus + immuuttisuus
 - ✅ Leaderboard + lajisuodatin
 - ✅ Tuotanto-deploy (Nginx + SSL + PM2)
-- ⬜ SMTP-palvelin (Postfix + DKIM)
-- ⬜ Realtime-päivitykset
+- ✅ SMTP-palvelin (Postfix + DKIM) — ks. [deploy/POSTFIX.md](deploy/POSTFIX.md)
+- ✅ RLS-tiukennukset (column-level grants, tilakone, immuuttiset tulokset)
+- ⬜ Realtime-päivitykset (osittain käytössä)
 - ⬜ Avatar / profiilisivu

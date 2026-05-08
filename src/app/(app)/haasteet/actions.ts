@@ -10,13 +10,27 @@ export async function respondChallenge(
 ): Promise<{ error?: string; ok?: boolean }> {
   const supabase = await createClient();
 
-  const { error } = await supabase
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) return { error: "Ei kirjautunut" };
+
+  // Vain vastustaja voi vastata, ja vain pending-tilassa olevaan haasteeseen.
+  // .select() palauttaa muuttuneet rivit -> tarkistetaan rowcount.
+  const { data, error } = await supabase
     .from("games")
     .update({ status: accept ? "accepted" : "declined" })
     .eq("id", challengeId)
-    .eq("status", "pending");
+    .eq("opponent_id", user.id)
+    .eq("status", "pending")
+    .select("id");
 
   if (error) return { error: error.message };
+  if (!data || data.length === 0) {
+    return { error: "Haastetta ei löytynyt tai siihen on jo vastattu." };
+  }
+
   revalidatePath("/haasteet");
+  revalidatePath("/pelit");
   return { ok: true };
 }

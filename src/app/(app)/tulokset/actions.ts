@@ -25,7 +25,7 @@ export async function recordResult(formData: FormData) {
 
   const { data: game } = await supabase
     .from("games")
-    .select("challenger_id, opponent_id")
+    .select("challenger_id, opponent_id, status")
     .eq("id", gameId)
     .single();
   if (!game) return { error: "Peliä ei löydy" };
@@ -34,6 +34,15 @@ export async function recordResult(formData: FormData) {
   const isOpponent = game.opponent_id === user.id;
   if (!isChallenger && !isOpponent)
     return { error: "Et ole tämän pelin osapuoli" };
+
+  if (game.status !== "accepted") {
+    return {
+      error:
+        game.status === "completed"
+          ? "Peli on jo merkitty pelatuksi."
+          : "Tulosta voi kirjata vain hyväksytylle pelille.",
+    };
+  }
 
   const { data: existing } = await supabase
     .from("results")
@@ -87,19 +96,8 @@ export async function recordResult(formData: FormData) {
     if (error) return { error: error.message };
   }
 
-  // Tarkista onko molemmat vahvistaneet → peli pelatuksi.
-  const { data: r } = await supabase
-    .from("results")
-    .select("confirmed_by_challenger, confirmed_by_opponent")
-    .eq("game_id", gameId)
-    .single();
-
-  if (r?.confirmed_by_challenger && r?.confirmed_by_opponent) {
-    await supabase
-      .from("games")
-      .update({ status: "completed" })
-      .eq("id", gameId);
-  }
+  // Pelin status -> 'completed' tehdään tietokannan triggerillä
+  // (complete_game_when_confirmed) kun molemmat ovat vahvistaneet.
 
   revalidatePath("/tulokset");
   revalidatePath("/haasteet");

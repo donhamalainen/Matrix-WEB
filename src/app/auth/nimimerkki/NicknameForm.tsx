@@ -1,52 +1,34 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@/lib/supabase/client";
+import { createProfile } from "./actions";
 
 /**
- * Nimimerkin valinta -lomake. Luo public.users-rivin auth.uid()-id:llä.
+ * Nimimerkin valinta -lomake.
+ * Itse insert tehdään server actionissa createProfile(), joka lukee
+ * phone/email turvallisesti auth.users:sta — emme luota client-syötteisiin.
  */
-export default function NicknameForm({
-  phone,
-  email,
-}: {
-  phone: string | null;
-  email: string | null;
-}) {
+export default function NicknameForm() {
   const router = useRouter();
-  const supabase = createClient();
   const [nickname, setNickname] = useState("");
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [pending, startTransition] = useTransition();
 
-  async function submit(e: React.FormEvent) {
+  function submit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    setLoading(true);
-
-    const { data: userRes } = await supabase.auth.getUser();
-    const uid = userRes.user?.id;
-    if (!uid) {
-      setError("Istunto vanhentunut, kirjaudu uudelleen.");
-      setLoading(false);
-      return;
-    }
-
-    const { error } = await supabase.from("users").insert({
-      id: uid,
-      nickname: nickname.trim(),
-      phone,
-      email,
+    const data = new FormData();
+    data.set("nickname", nickname);
+    startTransition(async () => {
+      const res = await createProfile(data);
+      if (res.error) {
+        setError(res.error);
+        return;
+      }
+      router.replace("/pelit");
+      router.refresh();
     });
-
-    setLoading(false);
-    if (error) {
-      setError(error.message);
-      return;
-    }
-    router.replace("/pelit");
-    router.refresh();
   }
 
   return (
@@ -70,10 +52,10 @@ export default function NicknameForm({
       />
       <button
         type="submit"
-        disabled={loading || nickname.trim().length < 2}
+        disabled={pending || nickname.trim().length < 2}
         className="rounded-lg bg-violet-500 hover:bg-violet-400 disabled:opacity-60 text-white font-semibold py-3"
       >
-        {loading ? "Tallennetaan..." : "Jatka"}
+        {pending ? "Tallennetaan..." : "Jatka"}
       </button>
       {error && (
         <p className="text-sm text-rose-600 dark:text-rose-400">{error}</p>

@@ -11,13 +11,12 @@ export async function requireUser() {
   return { supabase, user };
 }
 
-/** Hakee käyttäjäprofiilin (users-taulu). */
+/** Hakee käyttäjäprofiilin (me-view: vain omat yhteystiedot). */
 export async function getProfile() {
   const { supabase, user } = await requireUser();
   const { data: profile } = await supabase
-    .from("users")
+    .from("me")
     .select("id, nickname, phone, email")
-    .eq("id", user.id)
     .maybeSingle();
   return { supabase, user, profile };
 }

@@ -7,8 +7,16 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get("code");
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/pelit";
+  const rawNext = searchParams.get("next") ?? "/pelit";
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!;
+
+  // Estä open-redirect: salli vain saman originin sisäiset polut.
+  // Hylkää protocol-relative (//evil.com), backslash-temput ja absoluuttiset URLit.
+  const isSafe =
+    rawNext.startsWith("/") &&
+    !rawNext.startsWith("//") &&
+    !rawNext.startsWith("/\\");
+  const next = isSafe ? rawNext : "/pelit";
 
   const response = NextResponse.redirect(`${siteUrl}${next}`);
 
