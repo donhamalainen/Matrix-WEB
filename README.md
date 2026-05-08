@@ -39,8 +39,11 @@ Sovellus: http://localhost:3000 · Mailpit (sähköpostitestaus): http://127.0.0
 
 ### 4. Migraatiot
 
+Migraatiot ovat moduulikohtaisia (skeema, RLS, triggerit, realtime) — kts. [supabase/migrations/](supabase/migrations/).
+
 ```bash
-npx supabase db push --linked    # tuotantoon
+npx supabase db push --linked    # aja uudet migraatiot tuotantoon
+npx supabase db reset --linked   # nollaa tuotanto + aja kaikki migraatiot (HUOM: tuhoaa datan)
 npx supabase db reset             # lokaalin nollaus + migraatiot
 ```
 
@@ -108,8 +111,12 @@ src/
 ├── proxy.ts                     # Middleware entry point
 supabase/
 ├── config.toml                  # Lokaalin Supabasen asetukset
-├── migrations/                  # SQL-migraatiot (ml. security_hardening)
-└── schema.sql                   # Tietokantaskeema
+├── migrations/                  # Modulaariset SQL-migraatiot
+│   ├── 20260502000000_schema.sql     # Taulut, indeksit, viewit (leaderboard, me)
+│   ├── 20260502000001_rls.sql        # RLS-politiikat ja grants
+│   ├── 20260502000002_triggers.sql   # complete_game_when_confirmed
+│   └── 20260502000003_realtime.sql   # Realtime publication
+└── schema.sql                   # Koontidokumentti (lähde: migraatiot)
 deploy/
 ├── setup.sh                     # Nginx + SSL asennus
 ├── POSTFIX.md                   # Postfix SMTP -dokumentaatio
