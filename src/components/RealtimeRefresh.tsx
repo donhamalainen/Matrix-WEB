@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
@@ -10,9 +10,12 @@ import { createClient } from "@/lib/supabase/client";
  */
 export function RealtimeRefresh() {
   const router = useRouter();
-  const supabase = createClient();
+  // Stabiloidaan client — ei luoda uutta instanssia joka renderöinnillä.
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  if (!supabaseRef.current) supabaseRef.current = createClient();
 
   useEffect(() => {
+    const supabase = supabaseRef.current!;
     const channel = supabase
       .channel("matrix-realtime")
       .on(
@@ -30,7 +33,7 @@ export function RealtimeRefresh() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [router]);
 
   return null;
 }

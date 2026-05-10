@@ -146,19 +146,20 @@ export default function ChallengeForm({ players }: { players: Player[] }) {
 
       {/* Lajin valinta */}
       <label className="text-sm font-medium">Laji</label>
-      <div className="flex gap-2">
+      <div className="grid grid-cols-4 gap-2">
         {SPORTS.map((s) => (
           <button
             type="button"
             key={s.value}
             onClick={() => setSport(s.value)}
-            className={`flex-1 py-2 rounded-lg text-sm font-semibold ${
+            className={`flex flex-col items-center gap-1 py-3 rounded-xl text-xs font-semibold transition-all ${
               sport === s.value
-                ? SPORT_BADGE[s.value]
-                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                ? SPORT_BADGE[s.value] + " scale-105 shadow-sm"
+                : "bg-zinc-100 dark:bg-zinc-800 text-zinc-500 hover:bg-zinc-200 dark:hover:bg-zinc-700"
             }`}
           >
-            {s.emoji} {s.label}
+            <span className="text-xl">{s.emoji}</span>
+            <span>{s.label}</span>
           </button>
         ))}
       </div>

@@ -24,7 +24,11 @@ create table if not exists public.games (
   id uuid primary key default gen_random_uuid(),
   challenger_id uuid not null references public.users(id) on delete cascade,
   opponent_id uuid not null references public.users(id) on delete cascade,
-  sport text not null check (sport in ('football', 'basketball', 'pingpong')),
+  sport text not null check (sport in (
+    'football', 'basketball', 'pingpong',
+    'volleyball', 'tennis', 'badminton',
+    'icehockey', 'darts', 'billiards', 'other'
+  )),
   status text not null default 'pending'
     check (status in ('pending', 'accepted', 'declined', 'completed')),
   scheduled_at timestamptz,

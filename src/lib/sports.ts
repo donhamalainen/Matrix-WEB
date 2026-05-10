@@ -1,21 +1,52 @@
-export type Sport = "football" | "basketball" | "pingpong";
+export type Sport =
+  | "football"
+  | "basketball"
+  | "pingpong"
+  | "volleyball"
+  | "tennis"
+  | "badminton"
+  | "icehockey"
+  | "darts"
+  | "billiards"
+  | "other";
 
 export const SPORTS: { value: Sport; label: string; emoji: string }[] = [
   { value: "football", label: "Jalkapallo", emoji: "⚽" },
   { value: "basketball", label: "Koripallo", emoji: "🏀" },
   { value: "pingpong", label: "Pingis", emoji: "🏓" },
+  { value: "volleyball", label: "Lentopallo", emoji: "🏐" },
+  { value: "tennis", label: "Tennis", emoji: "🎾" },
+  { value: "badminton", label: "Sulkapallo", emoji: "🏸" },
+  { value: "icehockey", label: "Jääkiekko", emoji: "🏒" },
+  { value: "darts", label: "Tikka", emoji: "🎯" },
+  { value: "billiards", label: "Biljardi", emoji: "🎱" },
+  { value: "other", label: "Muut", emoji: "🏅" },
 ];
 
 export const SPORT_LABEL: Record<Sport, string> = {
   football: "Jalkapallo",
   basketball: "Koripallo",
   pingpong: "Pingis",
+  volleyball: "Lentopallo",
+  tennis: "Tennis",
+  badminton: "Sulkapallo",
+  icehockey: "Jääkiekko",
+  darts: "Tikka",
+  billiards: "Biljardi",
+  other: "Muut",
 };
 
 export const SPORT_EMOJI: Record<Sport, string> = {
   football: "⚽",
   basketball: "🏀",
   pingpong: "🏓",
+  volleyball: "🏐",
+  tennis: "🎾",
+  badminton: "🏸",
+  icehockey: "🏒",
+  darts: "🎯",
+  billiards: "🎱",
+  other: "🏅",
 };
 
 // Tailwind v4 dynaamiset luokat eivät tueta suoraan -> käytetään valmiita ryhmiä.
@@ -27,10 +58,31 @@ export const SPORT_BADGE: Record<Sport, string> = {
     "bg-amber-100 text-amber-700 ring-1 ring-amber-200 dark:bg-amber-900/30 dark:text-amber-300 dark:ring-amber-800",
   pingpong:
     "bg-teal-100 text-teal-700 ring-1 ring-teal-200 dark:bg-teal-900/30 dark:text-teal-300 dark:ring-teal-800",
+  volleyball:
+    "bg-indigo-100 text-indigo-700 ring-1 ring-indigo-200 dark:bg-indigo-900/30 dark:text-indigo-300 dark:ring-indigo-800",
+  tennis:
+    "bg-lime-100 text-lime-700 ring-1 ring-lime-200 dark:bg-lime-900/30 dark:text-lime-300 dark:ring-lime-800",
+  badminton:
+    "bg-purple-100 text-purple-700 ring-1 ring-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:ring-purple-800",
+  icehockey:
+    "bg-sky-100 text-sky-700 ring-1 ring-sky-200 dark:bg-sky-900/30 dark:text-sky-300 dark:ring-sky-800",
+  darts:
+    "bg-orange-100 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:ring-orange-800",
+  billiards:
+    "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800",
+  other:
+    "bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700",
 };
 
 export const SPORT_DOT: Record<Sport, string> = {
   football: "bg-rose-400",
   basketball: "bg-amber-400",
   pingpong: "bg-teal-400",
+  volleyball: "bg-indigo-400",
+  tennis: "bg-lime-400",
+  badminton: "bg-purple-400",
+  icehockey: "bg-sky-400",
+  darts: "bg-orange-400",
+  billiards: "bg-emerald-400",
+  other: "bg-zinc-400",
 };

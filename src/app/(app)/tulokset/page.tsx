@@ -21,15 +21,14 @@ type GameWithResult = {
   scheduled_at: string | null;
   challenger: { id: string; nickname: string } | null;
   opponent: { id: string; nickname: string } | null;
-  results:
-    | {
-        score_challenger: number;
-        score_opponent: number;
-        confirmed_by_challenger: boolean;
-        confirmed_by_opponent: boolean;
-        played_at: string;
-      }[]
-    | null;
+  // game_id on UNIQUE → PostgREST palauttaa yksittäisen objektin, ei taulukkoa.
+  results: {
+    score_challenger: number;
+    score_opponent: number;
+    confirmed_by_challenger: boolean;
+    confirmed_by_opponent: boolean;
+    played_at: string;
+  } | null;
 };
 
 /**
@@ -68,7 +67,7 @@ export default async function TuloksetPage({
     losses = 0,
     draws = 0;
   for (const g of rows) {
-    const r = g.results?.[0];
+    const r = g.results;
     if (!r?.confirmed_by_challenger || !r?.confirmed_by_opponent) continue;
     const iAmChallenger = g.challenger_id === user.id;
     const my = iAmChallenger ? r.score_challenger : r.score_opponent;
@@ -101,15 +100,20 @@ export default async function TuloksetPage({
           <p className="text-sm text-zinc-500 italic">Ei vielä otteluita.</p>
         )}
         {rows.map((g) => {
-          const r = g.results?.[0] ?? null;
+          const r = g.results ?? null;
           const iAmChallenger = g.challenger_id === user.id;
           const isCompleted = g.status === "completed";
           const myConfirmed = iAmChallenger
             ? r?.confirmed_by_challenger
             : r?.confirmed_by_opponent;
           const pendingMyConfirm = !!(r && !myConfirmed && !isCompleted);
+          // Myös odottava osapuoli (jo vahvistanut, toinen ei vielä) näkee formin automaattisesti.
+          const iWaitingForOther = !!(r && myConfirmed && !isCompleted);
           const expanded =
-            focusId === g.id || (!isCompleted && !r) || pendingMyConfirm;
+            focusId === g.id ||
+            (!isCompleted && !r) ||
+            pendingMyConfirm ||
+            iWaitingForOther;
 
           return (
             <article
@@ -125,6 +129,10 @@ export default async function TuloksetPage({
                 {isCompleted ? (
                   <span className="text-xs font-semibold text-teal-600">
                     Vahvistettu ✓
+                  </span>
+                ) : r ? (
+                  <span className="text-xs font-semibold text-amber-500">
+                    Odottaa vahvistusta
                   </span>
                 ) : (
                   <span className="text-xs font-semibold text-zinc-500">
@@ -148,6 +156,11 @@ export default async function TuloksetPage({
                   {r.score_challenger} <span className="text-zinc-400">–</span>{" "}
                   {r.score_opponent}
                 </div>
+              ) : isCompleted ? (
+                // Peli merkitty pelatuksi mutta tulosta ei löydy (epäjohdonmukainen tila)
+                <p className="text-sm text-zinc-500 italic text-center py-2">
+                  Tulos kirjattu ✓
+                </p>
               ) : expanded ? (
                 <ResultForm
                   gameId={g.id}
