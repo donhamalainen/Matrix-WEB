@@ -8,6 +8,7 @@ export type Sport =
   | "icehockey"
   | "darts"
   | "billiards"
+  | "martialarts"
   | "other";
 
 export const SPORTS: { value: Sport; label: string; emoji: string }[] = [
@@ -20,6 +21,7 @@ export const SPORTS: { value: Sport; label: string; emoji: string }[] = [
   { value: "icehockey", label: "Jääkiekko", emoji: "🏒" },
   { value: "darts", label: "Tikka", emoji: "🎯" },
   { value: "billiards", label: "Biljardi", emoji: "🎱" },
+  { value: "martialarts", label: "Kamppailulaji", emoji: "🥋" },
   { value: "other", label: "Muut", emoji: "🏅" },
 ];
 
@@ -33,6 +35,7 @@ export const SPORT_LABEL: Record<Sport, string> = {
   icehockey: "Jääkiekko",
   darts: "Tikka",
   billiards: "Biljardi",
+  martialarts: "Kamppailulaji",
   other: "Muut",
 };
 
@@ -46,6 +49,7 @@ export const SPORT_EMOJI: Record<Sport, string> = {
   icehockey: "🏒",
   darts: "🎯",
   billiards: "🎱",
+  martialarts: "🥋",
   other: "🏅",
 };
 
@@ -70,6 +74,8 @@ export const SPORT_BADGE: Record<Sport, string> = {
     "bg-orange-100 text-orange-700 ring-1 ring-orange-200 dark:bg-orange-900/30 dark:text-orange-300 dark:ring-orange-800",
   billiards:
     "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800",
+  martialarts:
+    "bg-red-100 text-red-700 ring-1 ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800",
   other:
     "bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700",
 };
@@ -84,5 +90,6 @@ export const SPORT_DOT: Record<Sport, string> = {
   icehockey: "bg-sky-400",
   darts: "bg-orange-400",
   billiards: "bg-emerald-400",
+  martialarts: "bg-red-400",
   other: "bg-zinc-400",
 };

@@ -78,7 +78,7 @@ export default function LoginForm() {
     <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-800 p-6">
       <h1 className="text-2xl font-bold mb-1">Matrix</h1>
       <p className="text-sm text-zinc-500 mb-6">
-        Kirjaudu sähköpostilla — saat 6-numeroisen koodin viestillä.
+        Kirjaudu sähköpostilla — saat koodin tai vahvistuslinkin viestillä.
       </p>
 
       {step === "email" ? (
@@ -112,6 +112,9 @@ export default function LoginForm() {
           </label>
           <p className="text-xs text-zinc-500 -mt-1">
             Lähetetty osoitteeseen <span className="font-mono">{email}</span>
+          </p>
+          <p className="text-xs text-amber-600 dark:text-amber-400 -mt-1">
+            Ensimmäisellä kerralla saat linkin — klikkaa sitä sähköpostista.
           </p>
           <input
             id="otp"

@@ -13,3 +13,4 @@
 \i migrations/20260502000001_rls.sql
 \i migrations/20260502000002_triggers.sql
 \i migrations/20260502000003_realtime.sql
+\i migrations/20260502000005_clans.sql

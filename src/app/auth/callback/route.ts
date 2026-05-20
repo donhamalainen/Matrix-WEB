@@ -11,7 +11,6 @@ export async function GET(request: NextRequest) {
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL!;
 
   // Estä open-redirect: salli vain saman originin sisäiset polut.
-  // Hylkää protocol-relative (//evil.com), backslash-temput ja absoluuttiset URLit.
   const isSafe =
     rawNext.startsWith("/") &&
     !rawNext.startsWith("//") &&
@@ -41,6 +40,11 @@ export async function GET(request: NextRequest) {
   if (code) {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (!error) return response;
+
+    // Jos code_verifier puuttuu (avattu eri selaimessa), ohjaa kirjautumiseen
+    // ystävällisellä viestillä.
+    console.error("Auth callback error:", error.message);
+    return NextResponse.redirect(`${siteUrl}/kirjaudu?error=link_expired`);
   }
 
   // Implicit-flow: confirm signup / email change

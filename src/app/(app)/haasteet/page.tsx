@@ -16,12 +16,20 @@ type GameRow = {
   id: string;
   sport: Sport;
   status: "pending" | "accepted" | "declined" | "completed";
+  team_size: number;
   scheduled_at: string | null;
   created_at: string;
   challenger_id: string;
   opponent_id: string;
   challenger: { id: string; nickname: string } | null;
   opponent: { id: string; nickname: string } | null;
+};
+
+type GamePlayer = {
+  game_id: string;
+  user_id: string;
+  team: "home" | "away";
+  user: { id: string; nickname: string } | null;
 };
 
 const STATUS_LABEL: Record<GameRow["status"], string> = {
@@ -53,27 +61,67 @@ export default async function HaasteetPage({
 
   const { supabase, user } = await getProfile();
 
+  // Hae pelit joissa olen mukana joko kapteenina (challenger/opponent) tai
+  // tiimipelaajana (game_players). Tiimipelaajat näkevät pelit, mutta vain
+  // kapteenit voivat hyväksyä/hylätä.
+  const { data: teamGameRows } = await supabase
+    .from("game_players")
+    .select("game_id")
+    .eq("user_id", user.id);
+  const teamGameIds = (teamGameRows ?? []).map((r) => r.game_id as string);
+
   let q = supabase
     .from("games")
     .select(
-      `id, sport, status, scheduled_at, created_at,
+      `id, sport, status, team_size, scheduled_at, created_at,
        challenger_id, opponent_id,
        challenger:users!games_challenger_id_fkey(id, nickname),
        opponent:users!games_opponent_id_fkey(id, nickname)`,
     )
-    .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
     .order("created_at", { ascending: false });
+
+  // OR-filtteri: kapteenina TAI tiimipelaajana.
+  const orFilter = teamGameIds.length
+    ? `challenger_id.eq.${user.id},opponent_id.eq.${user.id},id.in.(${teamGameIds.join(",")})`
+    : `challenger_id.eq.${user.id},opponent_id.eq.${user.id}`;
+  q = q.or(orFilter);
 
   if (sportFilter) q = q.eq("sport", sportFilter);
 
   const { data: games } = await q;
   const rows = (games ?? []) as unknown as GameRow[];
 
+  // Hae pelaajat näytetyille tiimipeleille.
+  const shownGameIds = rows.filter((g) => g.team_size > 1).map((g) => g.id);
+  let playersByGame: Record<string, GamePlayer[]> = {};
+  if (shownGameIds.length) {
+    const { data: gps } = await supabase
+      .from("game_players")
+      .select(`game_id, user_id, team, user:users(id, nickname)`)
+      .in("game_id", shownGameIds);
+    playersByGame = ((gps ?? []) as unknown as GamePlayer[]).reduce(
+      (acc, gp) => {
+        (acc[gp.game_id] ??= []).push(gp);
+        return acc;
+      },
+      {} as Record<string, GamePlayer[]>,
+    );
+  }
+
+  // Kapteenina vastattavat (vain sinä voit hyväksyä/hylätä).
   const incoming = rows.filter(
     (g) => g.opponent_id === user.id && g.status === "pending",
   );
+  // Omat lähettämäni haasteet jotka odottavat vastausta.
   const sent = rows.filter(
     (g) => g.challenger_id === user.id && g.status === "pending",
+  );
+  // Tiimiläisenä odottavat (et ole kapteeni, joku muu päättää).
+  const teamPending = rows.filter(
+    (g) =>
+      g.status === "pending" &&
+      g.challenger_id !== user.id &&
+      g.opponent_id !== user.id,
   );
   const other = rows.filter((g) => g.status !== "pending");
 
@@ -88,7 +136,12 @@ export default async function HaasteetPage({
           <Empty text="Ei uusia haasteita." />
         ) : (
           incoming.map((g) => (
-            <GameCard key={g.id} g={g} myId={user.id}>
+            <GameCard
+              key={g.id}
+              g={g}
+              myId={user.id}
+              players={playersByGame[g.id]}
+            >
               <RespondButtons challengeId={g.id} />
             </GameCard>
           ))
@@ -99,15 +152,42 @@ export default async function HaasteetPage({
         {sent.length === 0 ? (
           <Empty text="Ei lähetettyjä haasteita." />
         ) : (
-          sent.map((g) => <GameCard key={g.id} g={g} myId={user.id} />)
+          sent.map((g) => (
+            <GameCard
+              key={g.id}
+              g={g}
+              myId={user.id}
+              players={playersByGame[g.id]}
+            />
+          ))
         )}
       </Section>
+
+      {teamPending.length > 0 && (
+        <Section title={`Tiimisi peleissä mukana (${teamPending.length})`}>
+          {teamPending.map((g) => (
+            <GameCard
+              key={g.id}
+              g={g}
+              myId={user.id}
+              players={playersByGame[g.id]}
+            />
+          ))}
+        </Section>
+      )}
 
       <Section title="Historia">
         {other.length === 0 ? (
           <Empty text="Ei vielä päättyneitä haasteita." />
         ) : (
-          other.map((g) => <GameCard key={g.id} g={g} myId={user.id} />)
+          other.map((g) => (
+            <GameCard
+              key={g.id}
+              g={g}
+              myId={user.id}
+              players={playersByGame[g.id]}
+            />
+          ))
         )}
       </Section>
     </div>
@@ -138,23 +218,41 @@ function Empty({ text }: { text: string }) {
 function GameCard({
   g,
   myId,
+  players,
   children,
 }: {
   g: GameRow;
   myId: string;
+  players?: GamePlayer[];
   children?: React.ReactNode;
 }) {
+  const iAmCaptain = g.challenger_id === myId || g.opponent_id === myId;
   const other = g.challenger_id === myId ? g.opponent : g.challenger;
-  const direction = g.challenger_id === myId ? "Sinä vs" : "haastaa sinut";
+  const direction = iAmCaptain
+    ? g.challenger_id === myId
+      ? "Sinä vs"
+      : "haastaa sinut"
+    : "Tiimisi mukana";
+
+  const homePlayers = players?.filter((p) => p.team === "home") ?? [];
+  const awayPlayers = players?.filter((p) => p.team === "away") ?? [];
+  const showTeams = g.team_size > 1 && players && players.length > 0;
 
   return (
     <article className="rounded-xl bg-white dark:bg-zinc-900 ring-1 ring-zinc-200 dark:ring-zinc-800 p-4">
       <div className="flex items-center justify-between gap-2">
-        <span
-          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${SPORT_BADGE[g.sport]}`}
-        >
-          {SPORT_EMOJI[g.sport]} {SPORT_LABEL[g.sport]}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span
+            className={`px-2 py-0.5 rounded-full text-xs font-semibold ${SPORT_BADGE[g.sport]}`}
+          >
+            {SPORT_EMOJI[g.sport]} {SPORT_LABEL[g.sport]}
+          </span>
+          {g.team_size > 1 && (
+            <span className="px-2 py-0.5 rounded-full text-xs font-semibold bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-300">
+              {g.team_size}v{g.team_size}
+            </span>
+          )}
+        </div>
         <span
           className={`px-2 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[g.status]}`}
         >
@@ -162,10 +260,18 @@ function GameCard({
         </span>
       </div>
 
-      <p className="mt-2 text-base">
-        <span className="text-zinc-500 text-sm">{direction} </span>
-        <span className="font-bold">@{other?.nickname ?? "—"}</span>
-      </p>
+      {showTeams ? (
+        <div className="mt-2 grid grid-cols-[1fr_auto_1fr] gap-2 items-center">
+          <TeamList players={homePlayers} myId={myId} align="left" />
+          <span className="text-zinc-400 text-sm font-bold">vs</span>
+          <TeamList players={awayPlayers} myId={myId} align="right" />
+        </div>
+      ) : (
+        <p className="mt-2 text-base">
+          <span className="text-zinc-500 text-sm">{direction} </span>
+          <span className="font-bold">@{other?.nickname ?? "—"}</span>
+        </p>
+      )}
 
       {g.scheduled_at && (
         <p className="text-xs text-zinc-500 mt-1">
@@ -173,7 +279,7 @@ function GameCard({
         </p>
       )}
 
-      {g.status === "accepted" && (
+      {g.status === "accepted" && iAmCaptain && (
         <Link
           href={`/tulokset?game=${g.id}`}
           className="mt-3 block text-center rounded-lg bg-violet-500 hover:bg-violet-400 text-white text-sm py-2 font-semibold"
@@ -181,8 +287,44 @@ function GameCard({
           Kirjaa tulos →
         </Link>
       )}
+      {g.status === "accepted" && !iAmCaptain && (
+        <p className="mt-3 text-xs text-zinc-500 italic text-center">
+          Tuloksen kirjaa kapteeni
+        </p>
+      )}
 
       {children}
     </article>
+  );
+}
+
+function TeamList({
+  players,
+  myId,
+  align,
+}: {
+  players: GamePlayer[];
+  myId: string;
+  align: "left" | "right";
+}) {
+  return (
+    <ul
+      className={`flex flex-col gap-0.5 ${
+        align === "right" ? "items-end text-right" : "items-start text-left"
+      }`}
+    >
+      {players.map((p) => (
+        <li
+          key={p.user_id}
+          className={`text-sm ${
+            p.user_id === myId
+              ? "font-bold text-violet-700 dark:text-violet-300"
+              : "font-medium"
+          }`}
+        >
+          @{p.user?.nickname ?? "?"}
+        </li>
+      ))}
+    </ul>
   );
 }

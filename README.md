@@ -1,10 +1,48 @@
-# Matrix — Haastesovellus
+# Matrix — Kilpailualusta
 
-Nuorten haastesovellus tapahtumiin ja koulukäyttöön. Käyttäjät voivat haastaa toisiaan eri lajeissa, kirjata tuloksia ja seurata rankingia.
+Reaalimaailman kilpailualusta jossa yksilöt ja joukkueet voivat haastaa toisiaan eri lajeissa, kerätä pisteitä ja rakentaa yhteisöjä.
 
-**Stack:** Next.js 16 (App Router) · React 19 · Tailwind v4 · Supabase (Postgres + Auth + RLS)
+**Stack:** Next.js 16 (App Router) · React 19 · Tailwind v4 · Supabase (Postgres + Auth + RLS + Realtime)
 
 **Tuotanto:** https://matrix.boggo.fi
+
+## Ominaisuudet
+
+### Solo / Spontaanipelit
+
+- Haasta toinen pelaaja nimimerkillä
+- Valitse laji (10 lajia) ja pelimuoto (1v1, 2v2, 3v3, 5v5, 11v11)
+- Flow: Challenge → Hyväksyntä → Peli IRL → Tulos → Ranking päivittyy
+
+### Tiimipelit (2v2+)
+
+- Valitse oma tiimi + vastustajatiimi pelaajapickeristä
+- Haasteen vastaanottaa vastustajan "kapteeni" (away-tiimin ensimmäinen pelaaja)
+- Kaikki tiimipelaajat näkevät pelin haasteet- ja tulokset-sivuilla
+- Vain kapteenit (challenger/opponent) voivat hyväksyä haasteen ja kirjata tuloksen
+- Tulos lasketaan leaderboardiin **kaikille** tiimipelaajille (game_players-taulu)
+
+### Clan / Joukkuejärjestelmä
+
+- Luo clan (nimi, tagi, kuvaus, avoin/suljettu)
+- **Avoin clan** — kuka tahansa voi liittyä suoraan
+- **Suljettu clan** — liittymispyyntö → omistaja/admin hyväksyy
+- Kutsu pelaajia nimimerkillä → kutsuttu hyväksyy/hylkää
+- Pelaaja voi kuulua vain yhteen claniin kerrallaan
+- Roolit: owner, admin, member
+- Omistaja voi poistaa jäseniä (kick)
+
+### Ranking / Leaderboard
+
+- Yksilöpohjainen pistejärjestelmä per laji
+- Leaderboard yhdistää vanhat 1v1-pelit (challenger/opponent) ja uudet tiimipelit (game_players)
+- Lajisuodatin kaikilla sivuilla
+- Vain molemmin puolin vahvistetut tulokset lasketaan
+
+### Realtime
+
+- Automaattinen sivunpäivitys muutoksissa (games, results, game_players, clan_members, clan_invites, clan_join_requests)
+- 1 sekunnin debounce estää refresh-stormin
 
 ## Käynnistys (lokaali kehitys)
 
@@ -87,57 +125,72 @@ Postfix + OpenDKIM Raspberry Pi:llä OTP-viestien lähettämiseen. Vaatii portti
 ```
 src/
 ├── app/
-│   ├── kirjaudu/                # Email OTP -kirjautuminen (server-side session check)
+│   ├── kirjaudu/                # Email OTP -kirjautuminen
 │   ├── auth/
-│   │   ├── callback/route.ts    # PKCE + token_hash, validoitu next-redirect
-│   │   └── nimimerkki/          # Nimimerkin asetus (server action createProfile)
+│   │   ├── callback/route.ts    # PKCE + token_hash
+│   │   └── nimimerkki/          # Nimimerkin asetus
 │   ├── (app)/                   # Suojattu app shell (yläpalkki + alanavi)
-│   │   ├── pelit/               # Pelit, haasteen lähetys
-│   │   ├── haasteet/            # Saapuneet, hyväksy/hylkää (vain vastustaja)
+│   │   ├── pelit/               # Pelit, haasteen lähetys (+ team size)
+│   │   ├── haasteet/            # Saapuneet, hyväksy/hylkää
+│   │   ├── clan/                # Clan-järjestelmä
+│   │   │   ├── page.tsx         # Oma clan tai clanlista + kutsut + pyynnöt
+│   │   │   ├── luo/             # Clanin luonti (nimi, tagi, avoin/suljettu)
+│   │   │   ├── actions.ts       # create/join/leave/kick/invite/accept/decline
+│   │   │   ├── ClanInviteForm   # Kutsu pelaaja nimimerkillä
+│   │   │   ├── ClanInviteList   # Saapuneet kutsut (hyväksy/hylkää)
+│   │   │   ├── ClanJoinRequests # Liittymispyynnöt omistajalle
+│   │   │   └── ClanJoinButton   # Liity/Pyydä liittyä
 │   │   ├── tulokset/            # Tuloksen kirjaus + historia
 │   │   └── ranking/             # Leaderboard + lajisuodatin
 │   ├── layout.tsx
 │   └── page.tsx                 # Redirect → /pelit
 ├── components/
-│   ├── BottomNav.tsx            # Mobiilin alapalkki
+│   ├── BottomNav.tsx            # Mobiilin alapalkki (5 tabia)
+│   ├── RealtimeRefresh.tsx      # Realtime-kuuntelija (debounced)
 │   └── SportFilter.tsx          # Lajisuodatin (URL-param)
 ├── lib/
 │   ├── supabase/
 │   │   ├── client.ts            # Browser-client
 │   │   ├── server.ts            # Server Component -client (cookies)
 │   │   └── proxy.ts             # Middleware: sessio + reittisuojaus
-│   ├── auth.ts                  # requireUser / getProfile (lukee me-viewä)
+│   ├── auth.ts                  # requireUser / getProfile
 │   └── sports.ts                # Lajien metadata + värikoodit
 ├── proxy.ts                     # Middleware entry point
 supabase/
 ├── config.toml                  # Lokaalin Supabasen asetukset
-├── migrations/                  # Modulaariset SQL-migraatiot
-│   ├── 20260502000000_schema.sql     # Taulut, indeksit, viewit (leaderboard, me)
-│   ├── 20260502000001_rls.sql        # RLS-politiikat ja grants
-│   ├── 20260502000002_triggers.sql   # complete_game_when_confirmed
-│   └── 20260502000003_realtime.sql   # Realtime publication
-└── schema.sql                   # Koontidokumentti (lähde: migraatiot)
+├── migrations/
+│   ├── 20260502000000_schema.sql       # Taulut (users, games, results + viewit)
+│   ├── 20260502000001_rls.sql          # RLS-politiikat ja grants
+│   ├── 20260502000002_triggers.sql     # complete_game_when_confirmed
+│   ├── 20260502000003_realtime.sql     # Realtime publication
+│   ├── 20260502000004_add_sports.sql   # Lajilista laajennus
+│   ├── 20260502000005_clans.sql        # Clanit + clan_members + team_size
+│   ├── 20260502000006_fix_clan_invite_rls.sql  # Omistaja voi kutsua
+│   ├── 20260502000007_clan_invites.sql         # Kutsujärjestelmä
+│   ├── 20260502000008_clan_open_and_join_requests.sql  # Avoin/suljettu + pyynnöt
+│   ├── 20260502000009_game_players.sql         # Tiimipelaajat + leaderboard v2
+│   └── 20260502000010_realtime_extra.sql       # Realtime: game_players + clan-taulut
+└── schema.sql                   # Koontidokumentti
 deploy/
 ├── setup.sh                     # Nginx + SSL asennus
-├── POSTFIX.md                   # Postfix SMTP -dokumentaatio
 └── nginx/matrix.boggo.fi        # Nginx-konfiguraatio
 ```
 
 ## Päänäkymät
 
-| Reitti      | Sisältö                               |
-| ----------- | ------------------------------------- |
-| `/kirjaudu` | Sähköposti → OTP-koodi                |
-| `/pelit`    | Pelit, haasteen luonti                |
-| `/haasteet` | Saapuneet & lähetetyt, hyväksy/hylkää |
-| `/tulokset` | Tuloksen kirjaus + historia           |
-| `/ranking`  | Leaderboard, lajisuodatin             |
+| Reitti      | Sisältö                                   |
+| ----------- | ----------------------------------------- |
+| `/kirjaudu` | Sähköposti → OTP-koodi                    |
+| `/pelit`    | Pelit, haasteen luonti (laji + team size) |
+| `/haasteet` | Saapuneet & lähetetyt, hyväksy/hylkää     |
+| `/clan`     | Oma clan / clanlista / kutsut / pyynnöt   |
+| `/clan/luo` | Uuden clanin luonti                       |
+| `/tulokset` | Tuloksen kirjaus + historia               |
+| `/ranking`  | Leaderboard, lajisuodatin                 |
 
-## Lajien värikoodit
+## Lajit
 
-- ⚽ Jalkapallo → emerald (vihreä)
-- 🏀 Koripallo → amber (keltainen)
-- 🏓 Pingis → sky (sininen)
+⚽ Jalkapallo · 🏀 Koripallo · 🏓 Pingis · 🏐 Lentopallo · 🎾 Tennis · 🏸 Sulkapallo · 🏒 Jääkiekko · 🎯 Tikka · 🎱 Biljardi · 🏅 Muut
 
 ## Pisteytys
 
@@ -147,7 +200,7 @@ Ottelu lasketaan rankingiin vasta kun **molemmat osapuolet** ovat vahvistaneet s
 
 ## Tietoturva
 
-Row Level Security on päällä kaikissa tauluissa. Tarkemmat politiikat: [supabase/schema.sql](supabase/schema.sql).
+Row Level Security on päällä kaikissa tauluissa (`users`, `games`, `results`, `game_players`, `clans`, `clan_members`, `clan_invites`, `clan_join_requests`). Tarkemmat politiikat: [supabase/migrations/](supabase/migrations/).
 
 ### Käyttäjät (`public.users`)
 

@@ -18,11 +18,21 @@ export default async function PelitPage() {
     .neq("id", user.id)
     .order("nickname");
 
-  // Hae oma pelitilasto (kaikki pelit joissa olen osapuolena).
+  // Hae oma pelitilasto (kaikki pelit joissa olen osapuolena tai tiimiläisenä).
+  const { data: teamGameRows } = await supabase
+    .from("game_players")
+    .select("game_id")
+    .eq("user_id", user.id);
+  const teamGameIds = (teamGameRows ?? []).map((r) => r.game_id as string);
+
+  const statsOrFilter = teamGameIds.length
+    ? `challenger_id.eq.${user.id},opponent_id.eq.${user.id},id.in.(${teamGameIds.join(",")})`
+    : `challenger_id.eq.${user.id},opponent_id.eq.${user.id}`;
+
   const { data: myGames } = await supabase
     .from("games")
     .select("id, status")
-    .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`);
+    .or(statsOrFilter);
 
   const total = myGames?.length ?? 0;
   const pending = myGames?.filter((g) => g.status === "pending").length ?? 0;

@@ -1,18 +1,26 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 /**
  * Kuuntelee Supabase Realtime -muutoksia games- ja results-tauluihin
  * ja päivittää sivun automaattisesti ilman manuaalista refreshiä.
+ * Debounce estää refresh-stormin.
  */
 export function RealtimeRefresh() {
   const router = useRouter();
-  // Stabiloidaan client — ei luoda uutta instanssia joka renderöinnillä.
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   if (!supabaseRef.current) supabaseRef.current = createClient();
+
+  const debouncedRefresh = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      router.refresh();
+    }, 1000);
+  }, [router]);
 
   useEffect(() => {
     const supabase = supabaseRef.current!;
@@ -21,19 +29,40 @@ export function RealtimeRefresh() {
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "games" },
-        () => router.refresh(),
+        debouncedRefresh,
       )
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "results" },
-        () => router.refresh(),
+        debouncedRefresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "game_players" },
+        debouncedRefresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "clan_members" },
+        debouncedRefresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "clan_invites" },
+        debouncedRefresh,
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "clan_join_requests" },
+        debouncedRefresh,
       )
       .subscribe();
 
     return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
       supabase.removeChannel(channel);
     };
-  }, [router]);
+  }, [debouncedRefresh]);
 
   return null;
 }

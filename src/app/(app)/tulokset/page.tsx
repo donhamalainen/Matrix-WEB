@@ -45,6 +45,17 @@ export default async function TuloksetPage({
 
   const { supabase, user } = await getProfile();
 
+  // Hae pelit joissa olen mukana joko kapteenina tai tiimipelaajana.
+  const { data: teamGameRows } = await supabase
+    .from("game_players")
+    .select("game_id")
+    .eq("user_id", user.id);
+  const teamGameIds = (teamGameRows ?? []).map((r) => r.game_id as string);
+
+  const orFilter = teamGameIds.length
+    ? `challenger_id.eq.${user.id},opponent_id.eq.${user.id},id.in.(${teamGameIds.join(",")})`
+    : `challenger_id.eq.${user.id},opponent_id.eq.${user.id}`;
+
   let q = supabase
     .from("games")
     .select(
@@ -53,7 +64,7 @@ export default async function TuloksetPage({
        opponent:users!games_opponent_id_fkey(id, nickname),
        results(score_challenger, score_opponent, confirmed_by_challenger, confirmed_by_opponent, played_at)`,
     )
-    .or(`challenger_id.eq.${user.id},opponent_id.eq.${user.id}`)
+    .or(orFilter)
     .in("status", ["accepted", "completed"])
     .order("created_at", { ascending: false });
 
@@ -62,6 +73,20 @@ export default async function TuloksetPage({
   const { data } = await q;
   const rows = (data ?? []) as unknown as GameWithResult[];
 
+  // Hae tiimiroolit (home/away) tiimipeleille jotta yhteenveto on oikein.
+  const gameIds = rows.map((g) => g.id);
+  let myTeamByGame: Record<string, "home" | "away"> = {};
+  if (gameIds.length) {
+    const { data: myPlayerRows } = await supabase
+      .from("game_players")
+      .select("game_id, team")
+      .eq("user_id", user.id)
+      .in("game_id", gameIds);
+    for (const row of myPlayerRows ?? []) {
+      myTeamByGame[row.game_id as string] = row.team as "home" | "away";
+    }
+  }
+
   // Laske yhteenveto vain molemmin puolin vahvistetuista.
   let wins = 0,
     losses = 0,
@@ -69,11 +94,22 @@ export default async function TuloksetPage({
   for (const g of rows) {
     const r = g.results;
     if (!r?.confirmed_by_challenger || !r?.confirmed_by_opponent) continue;
-    const iAmChallenger = g.challenger_id === user.id;
-    const my = iAmChallenger ? r.score_challenger : r.score_opponent;
-    const their = iAmChallenger ? r.score_opponent : r.score_challenger;
-    if (my > their) wins++;
-    else if (my < their) losses++;
+
+    // Päätä oma tiimi: game_players > fallback kapteenilogiikka.
+    const myTeam = myTeamByGame[g.id];
+    let myScore: number, theirScore: number;
+    if (myTeam) {
+      myScore = myTeam === "home" ? r.score_challenger : r.score_opponent;
+      theirScore = myTeam === "home" ? r.score_opponent : r.score_challenger;
+    } else {
+      // Fallback vanhoille peleille ilman game_players-rivejä.
+      const iAmChallenger = g.challenger_id === user.id;
+      myScore = iAmChallenger ? r.score_challenger : r.score_opponent;
+      theirScore = iAmChallenger ? r.score_opponent : r.score_challenger;
+    }
+
+    if (myScore > theirScore) wins++;
+    else if (myScore < theirScore) losses++;
     else draws++;
   }
   const played = wins + losses + draws;
@@ -102,18 +138,34 @@ export default async function TuloksetPage({
         {rows.map((g) => {
           const r = g.results ?? null;
           const iAmChallenger = g.challenger_id === user.id;
+          const iAmOpponent = g.opponent_id === user.id;
+          const iAmCaptain = iAmChallenger || iAmOpponent;
           const isCompleted = g.status === "completed";
+
+          // Tiimiläiset eivät voi vahvistaa — vain kapteenit.
           const myConfirmed = iAmChallenger
             ? r?.confirmed_by_challenger
-            : r?.confirmed_by_opponent;
-          const pendingMyConfirm = !!(r && !myConfirmed && !isCompleted);
-          // Myös odottava osapuoli (jo vahvistanut, toinen ei vielä) näkee formin automaattisesti.
-          const iWaitingForOther = !!(r && myConfirmed && !isCompleted);
+            : iAmOpponent
+              ? r?.confirmed_by_opponent
+              : true; // tiimiläinen ei vahvista
+          const pendingMyConfirm = !!(
+            iAmCaptain &&
+            r &&
+            !myConfirmed &&
+            !isCompleted
+          );
+          const iWaitingForOther = !!(
+            iAmCaptain &&
+            r &&
+            myConfirmed &&
+            !isCompleted
+          );
           const expanded =
-            focusId === g.id ||
-            (!isCompleted && !r) ||
-            pendingMyConfirm ||
-            iWaitingForOther;
+            iAmCaptain &&
+            (focusId === g.id ||
+              (!isCompleted && !r) ||
+              pendingMyConfirm ||
+              iWaitingForOther);
 
           return (
             <article
@@ -157,7 +209,6 @@ export default async function TuloksetPage({
                   {r.score_opponent}
                 </div>
               ) : isCompleted ? (
-                // Peli merkitty pelatuksi mutta tulosta ei löydy (epäjohdonmukainen tila)
                 <p className="text-sm text-zinc-500 italic text-center py-2">
                   Tulos kirjattu ✓
                 </p>
@@ -169,6 +220,10 @@ export default async function TuloksetPage({
                   iAmChallenger={iAmChallenger}
                   existing={r}
                 />
+              ) : !iAmCaptain ? (
+                <p className="text-sm text-zinc-500 italic text-center py-2">
+                  Kapteeni kirjaa tuloksen
+                </p>
               ) : (
                 <Link
                   href={`/tulokset?game=${g.id}${
