@@ -37,14 +37,14 @@ export default function LoginForm() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    // Ensisijaisesti NEXT_PUBLIC_SITE_URL (tuotannossa aina matrix.boggo.fi),
-    // fallback selaimen originiin lokaalia kehitystä varten.
-    const siteUrl =
-      process.env.NEXT_PUBLIC_SITE_URL ||
-      (typeof window !== "undefined" ? window.location.origin : undefined);
+    // KÄYTÄ AINA NEXT_PUBLIC_SITE_URL -arvoa. Tuotannossa ".env" sisältää
+    // https://matrix.boggo.fi. Lokaalisti se on http://localhost:3000.
+    // EI IKINÄ window.location.origin — sähköpostilinkki ei voi vahingossa
+    // viedä SSH-tunnelin, paikallisen testin tai muun osoitteen kautta.
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
     if (!siteUrl) {
       setLoading(false);
-      setError("Sivuston URL puuttuu (NEXT_PUBLIC_SITE_URL).");
+      setError("NEXT_PUBLIC_SITE_URL puuttuu .env-tiedostosta.");
       return;
     }
     const { error } = await supabase.auth.signInWithOtp({
