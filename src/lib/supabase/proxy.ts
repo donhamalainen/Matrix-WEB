@@ -35,6 +35,12 @@ export async function updateSession(request: NextRequest) {
   const isPublic = PUBLIC_PATHS.some((p) => path.startsWith(p));
 
   if (!user && !isPublic) {
+    // KÄYTÄ AINA NEXT_PUBLIC_SITE_URL — Nginxin takana request.nextUrl voi
+    // kantaa localhost:3001 -originia, joka päätyisi selaimen osoiteriville.
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    if (siteUrl) {
+      return NextResponse.redirect(new URL("/kirjaudu", siteUrl));
+    }
     const url = request.nextUrl.clone();
     url.pathname = "/kirjaudu";
     return NextResponse.redirect(url);

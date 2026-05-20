@@ -12,7 +12,7 @@ import type { EmailOtpType } from "@supabase/supabase-js";
  * molemmat.
  */
 export async function handleAuthRedirect(request: NextRequest) {
-  const { searchParams, origin } = request.nextUrl;
+  const { searchParams } = request.nextUrl;
   const code = searchParams.get("code");
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
@@ -28,16 +28,25 @@ export async function handleAuthRedirect(request: NextRequest) {
     !rawNext.startsWith("/\\");
   const next = isSafe ? rawNext : "/pelit";
 
-  // Käytä pyynnön omaa originia — toimii oikein myös vaikka
-  // NEXT_PUBLIC_SITE_URL olisi väärin tai puuttuisi.
-  const successUrl = new URL(next, origin);
+  // KÄYTÄ AINA NEXT_PUBLIC_SITE_URL -arvoa, EI `request.nextUrl.origin`,
+  // koska Nginxin takana Next.js voi nähdä originin "localhost:3001" eikä
+  // "https://matrix.boggo.fi". Tämä varmistaa että käyttäjä päätyy aina
+  // sovelluksen oikeaan julkiseen osoitteeseen.
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (!siteUrl) {
+    throw new Error(
+      "NEXT_PUBLIC_SITE_URL puuttuu — auth-redirect ei voi rakentaa kohde-URLia.",
+    );
+  }
+
+  const successUrl = new URL(next, siteUrl);
   const response = NextResponse.redirect(successUrl);
 
   // Jos Supabase välitti virheen suoraan paramissa, ohjaa kirjautumiseen.
   if (errorParam) {
     console.error("Auth redirect error:", errorParam, errorDescription);
     return NextResponse.redirect(
-      new URL(`/kirjaudu?error=${encodeURIComponent(errorParam)}`, origin),
+      new URL(`/kirjaudu?error=${encodeURIComponent(errorParam)}`, siteUrl),
     );
   }
 
@@ -64,7 +73,7 @@ export async function handleAuthRedirect(request: NextRequest) {
     if (!error) return response;
     console.error("exchangeCodeForSession failed:", error.message);
     return NextResponse.redirect(
-      new URL("/kirjaudu?error=link_expired", origin),
+      new URL("/kirjaudu?error=link_expired", siteUrl),
     );
   }
 
@@ -74,10 +83,10 @@ export async function handleAuthRedirect(request: NextRequest) {
     if (!error) return response;
     console.error("verifyOtp failed:", error.message);
     return NextResponse.redirect(
-      new URL("/kirjaudu?error=link_expired", origin),
+      new URL("/kirjaudu?error=link_expired", siteUrl),
     );
   }
 
   // Ei tunnistettavaa paramia — palaa kirjautumiseen.
-  return NextResponse.redirect(new URL("/kirjaudu", origin));
+  return NextResponse.redirect(new URL("/kirjaudu", siteUrl));
 }
