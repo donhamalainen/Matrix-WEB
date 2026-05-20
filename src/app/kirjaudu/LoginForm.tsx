@@ -5,18 +5,22 @@ import { useRouter } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 /**
- * Email OTP -kirjautumislomake.
- * Vaihe 1: syötä sähköposti → Supabase lähettää 6-numeroisen koodin.
- * Vaihe 2: syötä koodi sähköpostista → kirjaudutaan sisään.
+ * Sähköpostipohjainen kirjautuminen.
+ *
+ * Vaihe 1: syötä sähköposti → Supabase lähettää viestin, jossa on sekä
+ *          klikattava vahvistuslinkki että 6-numeroinen koodi.
+ * Vaihe 2: joko klikkaa linkkiä **samasta selaimesta** TAI syötä koodi alla.
+ *
+ * Linkki on luotettavin kun viesti avataan samalta laitteelta, jolla pyyntö
+ * tehtiin. Eri laitteelle siirryttäessä on aina varminta käyttää koodia.
  *
  * Vaatimukset Supabasessa:
  *  - Authentication → Email-provider on (oletus: päällä)
- *  - Email Templates → "Magic Link" -mallin sisällössä on {{ .Token }}
- *    (lähettää 6-numeroisen koodin pelkän linkin sijaan)
- *  - Lokaalisti: koodit näkyvät Mailpitissa (http://127.0.0.1:54324)
- *
- * Huom: kirjautuneen käyttäjän redirect tehdään server-puolella
- * /kirjaudu/page.tsx:ssä, joten tässä ei enää ole client-effektiä.
+ *  - Email Templates → "Confirm signup" JA "Magic Link" sisältävät sekä
+ *    `{{ .ConfirmationURL }}` että `{{ .Token }}` jotta sekä linkki että
+ *    koodi toimivat. Linkin tulisi osoittaa `<SiteURL>/auth/callback`
+ *    (tai `/auth/confirm` — molempia tuetaan).
+ *  - Lokaalisti: koodit/linkit näkyvät Mailpitissa (http://127.0.0.1:54324)
  */
 export default function LoginForm() {
   const router = useRouter();
@@ -33,7 +37,12 @@ export default function LoginForm() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL;
+    // Käytä selaimen omaa originia — toimii sekä lokaalisti että tuotannossa
+    // ilman erillistä env-asetusta. Fallback ympäristömuuttujaan.
+    const siteUrl =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : process.env.NEXT_PUBLIC_SITE_URL;
     if (!siteUrl) {
       setLoading(false);
       setError("Sivuston URL puuttuu (NEXT_PUBLIC_SITE_URL).");
@@ -78,7 +87,7 @@ export default function LoginForm() {
     <div className="w-full max-w-sm rounded-2xl bg-white dark:bg-zinc-900 shadow-sm ring-1 ring-zinc-200 dark:ring-zinc-800 p-6">
       <h1 className="text-2xl font-bold mb-1">Matrix</h1>
       <p className="text-sm text-zinc-500 mb-6">
-        Kirjaudu sähköpostilla — saat koodin tai vahvistuslinkin viestillä.
+        Kirjaudu sähköpostilla — saat viestin, jossa on linkki ja koodi.
       </p>
 
       {step === "email" ? (
@@ -102,20 +111,20 @@ export default function LoginForm() {
             disabled={loading || !email.includes("@")}
             className="mt-2 rounded-lg bg-violet-500 hover:bg-violet-400 disabled:opacity-60 text-white font-semibold py-3"
           >
-            {loading ? "Lähetetään..." : "Lähetä koodi"}
+            {loading ? "Lähetetään..." : "Lähetä viesti"}
           </button>
         </form>
       ) : (
         <form onSubmit={verifyOtp} className="flex flex-col gap-3">
-          <label className="text-sm font-medium" htmlFor="otp">
-            Syötä 6-numeroinen koodi
+          <div className="rounded-lg bg-violet-50 dark:bg-violet-950/30 ring-1 ring-violet-200 dark:ring-violet-900 p-3 text-sm text-violet-800 dark:text-violet-200">
+            Lähetimme viestin osoitteeseen{" "}
+            <span className="font-mono">{email}</span>.
+            <br />
+            Klikkaa linkkiä viestissä <strong>tai</strong> syötä koodi alla.
+          </div>
+          <label className="text-sm font-medium mt-1" htmlFor="otp">
+            6-numeroinen koodi
           </label>
-          <p className="text-xs text-zinc-500 -mt-1">
-            Lähetetty osoitteeseen <span className="font-mono">{email}</span>
-          </p>
-          <p className="text-xs text-amber-600 dark:text-amber-400 -mt-1">
-            Ensimmäisellä kerralla saat linkin — klikkaa sitä sähköpostista.
-          </p>
           <input
             id="otp"
             type="text"
@@ -125,7 +134,6 @@ export default function LoginForm() {
             placeholder="123456"
             value={otp}
             onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-            required
             maxLength={6}
             className="rounded-lg border border-zinc-300 dark:border-zinc-700 bg-transparent px-3 py-3 text-2xl tracking-[0.5em] text-center font-mono outline-none focus:ring-2 focus:ring-violet-400"
           />
@@ -134,12 +142,13 @@ export default function LoginForm() {
             disabled={loading || otp.length !== 6}
             className="mt-2 rounded-lg bg-violet-500 hover:bg-violet-400 disabled:opacity-60 text-white font-semibold py-3"
           >
-            {loading ? "Vahvistetaan..." : "Kirjaudu sisään"}
+            {loading ? "Vahvistetaan..." : "Kirjaudu koodilla"}
           </button>
           <button
             type="button"
             onClick={() => {
               setOtp("");
+              setError(null);
               setStep("email");
             }}
             className="text-sm text-zinc-500 underline"

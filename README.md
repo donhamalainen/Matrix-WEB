@@ -178,15 +178,32 @@ deploy/
 
 ## Päänäkymät
 
-| Reitti      | Sisältö                                   |
-| ----------- | ----------------------------------------- |
-| `/kirjaudu` | Sähköposti → OTP-koodi                    |
-| `/pelit`    | Pelit, haasteen luonti (laji + team size) |
-| `/haasteet` | Saapuneet & lähetetyt, hyväksy/hylkää     |
-| `/clan`     | Oma clan / clanlista / kutsut / pyynnöt   |
-| `/clan/luo` | Uuden clanin luonti                       |
-| `/tulokset` | Tuloksen kirjaus + historia               |
-| `/ranking`  | Leaderboard, lajisuodatin                 |
+| Reitti           | Sisältö                                           |
+| ---------------- | ------------------------------------------------- |
+| `/kirjaudu`      | Sähköposti → linkki **ja** 6-numeroinen koodi     |
+| `/auth/callback` | Sähköpostilinkin käsittely (sovelluksen oletus)   |
+| `/auth/confirm`  | Sähköpostilinkin käsittely (Supabasen oletuspath) |
+| `/pelit`         | Pelit, haasteen luonti (laji + team size)         |
+| `/haasteet`      | Saapuneet & lähetetyt, hyväksy/hylkää             |
+| `/clan`          | Oma clan / clanlista / kutsut / pyynnöt           |
+| `/clan/luo`      | Uuden clanin luonti                               |
+| `/tulokset`      | Tuloksen kirjaus + historia                       |
+| `/ranking`       | Leaderboard, lajisuodatin                         |
+
+## Kirjautumisen sähköpostimallit (Supabase)
+
+Sekä `Confirm signup`- että `Magic Link`-mallien tulisi sisältää **sekä linkki että koodi**, jotta käyttäjä voi vahvistaa
+kummalla tahansa (linkki toimii vain samasta selaimesta, koodi mistä tahansa):
+
+```html
+<p>Tervetuloa Matrixiin! Vahvista sähköpostiosoitteesi:</p>
+<p><a href="{{ .ConfirmationURL }}">Vahvista ja kirjaudu sisään →</a></p>
+<p>Tai syötä koodi sovellukseen: <strong>{{ .Token }}</strong></p>
+```
+
+Vinkki: jos haluat linkin toimivan luotettavasti myös eri laitteilla, korvaa `{{ .ConfirmationURL }}` muodolla
+`{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=signup` (tai `type=magiclink`). Tämä ohittaa PKCE-flown
+ja kelpaa minkä tahansa selaimen avaamana.
 
 ## Lajit
 

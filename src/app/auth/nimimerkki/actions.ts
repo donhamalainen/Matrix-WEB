@@ -28,6 +28,18 @@ export async function createProfile(
   } = await supabase.auth.getUser();
   if (!user) return { error: "Istunto vanhentunut, kirjaudu uudelleen." };
 
+  // Jos käyttäjällä on jo profiili (esim. tuplaklikkaus tai paluukäynti),
+  // älä yritä luoda toista — palauta vain ok.
+  const { data: existing } = await supabase
+    .from("users")
+    .select("id")
+    .eq("id", user.id)
+    .maybeSingle();
+  if (existing) {
+    revalidatePath("/", "layout");
+    return { ok: true };
+  }
+
   const { error } = await supabase.from("users").insert({
     id: user.id,
     nickname,
@@ -36,6 +48,8 @@ export async function createProfile(
   });
 
   if (error) {
+    // 23505 = unique_violation. Sekä id (PK) että nickname ovat unique.
+    // id-konflikti hoidettiin yllä, joten jäljellä on nickname.
     if (error.code === "23505") {
       return { error: "Nimimerkki on jo käytössä." };
     }

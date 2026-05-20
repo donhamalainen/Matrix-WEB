@@ -16,6 +16,7 @@ type ClanRow = {
   tag: string;
   description: string;
   owner_id: string;
+  open: boolean;
   created_at: string;
 };
 
@@ -81,9 +82,7 @@ export default async function ClanPage() {
           <h1 className="text-2xl font-bold">
             [{clanData.tag}] {clanData.name}
           </h1>
-          {isOwner && (
-            <ClanOpenToggle isOpen={(clanData as any).open ?? true} />
-          )}
+          {isOwner && <ClanOpenToggle isOpen={clanData.open ?? true} />}
         </div>
 
         {clanData.description && (

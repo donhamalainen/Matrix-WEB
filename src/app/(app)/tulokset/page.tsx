@@ -8,7 +8,6 @@ import {
 } from "@/lib/sports";
 import SportFilter from "@/components/SportFilter";
 import ResultForm from "./ResultForm";
-import { RealtimeRefresh } from "@/components/RealtimeRefresh";
 
 export const dynamic = "force-dynamic";
 
@@ -118,7 +117,6 @@ export default async function TuloksetPage({
 
   return (
     <div className="flex flex-col gap-4">
-      <RealtimeRefresh />
       <h1 className="text-2xl font-bold">Tulokset</h1>
 
       {/* Yhteenveto */}
