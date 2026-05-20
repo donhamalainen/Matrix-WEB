@@ -37,12 +37,11 @@ export default function LoginForm() {
     e.preventDefault();
     setError(null);
     setLoading(true);
-    // Käytä selaimen omaa originia — toimii sekä lokaalisti että tuotannossa
-    // ilman erillistä env-asetusta. Fallback ympäristömuuttujaan.
+    // Ensisijaisesti NEXT_PUBLIC_SITE_URL (tuotannossa aina matrix.boggo.fi),
+    // fallback selaimen originiin lokaalia kehitystä varten.
     const siteUrl =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : process.env.NEXT_PUBLIC_SITE_URL;
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      (typeof window !== "undefined" ? window.location.origin : undefined);
     if (!siteUrl) {
       setLoading(false);
       setError("Sivuston URL puuttuu (NEXT_PUBLIC_SITE_URL).");
