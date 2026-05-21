@@ -9,6 +9,9 @@ export type Sport =
   | "darts"
   | "billiards"
   | "martialarts"
+  | "golf"
+  | "discgolf"
+  | "padel"
   | "other";
 
 export const SPORTS: { value: Sport; label: string; emoji: string }[] = [
@@ -17,8 +20,11 @@ export const SPORTS: { value: Sport; label: string; emoji: string }[] = [
   { value: "pingpong", label: "Pingis", emoji: "🏓" },
   { value: "volleyball", label: "Lentopallo", emoji: "🏐" },
   { value: "tennis", label: "Tennis", emoji: "🎾" },
+  { value: "padel", label: "Padel", emoji: "🎾" },
   { value: "badminton", label: "Sulkapallo", emoji: "🏸" },
   { value: "icehockey", label: "Jääkiekko", emoji: "🏒" },
+  { value: "golf", label: "Golf", emoji: "⛳" },
+  { value: "discgolf", label: "Frisbeegolf", emoji: "🥏" },
   { value: "darts", label: "Tikka", emoji: "🎯" },
   { value: "billiards", label: "Biljardi", emoji: "🎱" },
   { value: "martialarts", label: "Kamppailulaji", emoji: "🥋" },
@@ -36,6 +42,9 @@ export const SPORT_LABEL: Record<Sport, string> = {
   darts: "Tikka",
   billiards: "Biljardi",
   martialarts: "Kamppailulaji",
+  golf: "Golf",
+  discgolf: "Frisbeegolf",
+  padel: "Padel",
   other: "Muut",
 };
 
@@ -50,6 +59,9 @@ export const SPORT_EMOJI: Record<Sport, string> = {
   darts: "🎯",
   billiards: "🎱",
   martialarts: "🥋",
+  golf: "⛳",
+  discgolf: "🥏",
+  padel: "🎾",
   other: "🏅",
 };
 
@@ -76,6 +88,11 @@ export const SPORT_BADGE: Record<Sport, string> = {
     "bg-emerald-100 text-emerald-700 ring-1 ring-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-300 dark:ring-emerald-800",
   martialarts:
     "bg-red-100 text-red-700 ring-1 ring-red-200 dark:bg-red-900/30 dark:text-red-300 dark:ring-red-800",
+  golf: "bg-green-100 text-green-700 ring-1 ring-green-200 dark:bg-green-900/30 dark:text-green-300 dark:ring-green-800",
+  discgolf:
+    "bg-yellow-100 text-yellow-700 ring-1 ring-yellow-200 dark:bg-yellow-900/30 dark:text-yellow-300 dark:ring-yellow-800",
+  padel:
+    "bg-fuchsia-100 text-fuchsia-700 ring-1 ring-fuchsia-200 dark:bg-fuchsia-900/30 dark:text-fuchsia-300 dark:ring-fuchsia-800",
   other:
     "bg-zinc-100 text-zinc-600 ring-1 ring-zinc-200 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-700",
 };
@@ -91,5 +108,8 @@ export const SPORT_DOT: Record<Sport, string> = {
   darts: "bg-orange-400",
   billiards: "bg-emerald-400",
   martialarts: "bg-red-400",
+  golf: "bg-green-400",
+  discgolf: "bg-yellow-400",
+  padel: "bg-fuchsia-400",
   other: "bg-zinc-400",
 };
